@@ -85,9 +85,10 @@ Echo_Response callback) {
         @Override
         protected boolean handleMessageWithResponder(
                 int methodId,
-                org.chromium.mojo.bindings.Message payload,
+                org.chromium.mojo.bindings.Decoder decoder,
                 org.chromium.mojo.bindings.MessageReceiver receiver,
                 long requestId) {
+            IFaceWithTypemap impl = getImpl();
             switch (methodId) {
 
 
@@ -97,10 +98,9 @@ Echo_Response callback) {
 
                 case ECHO_ORDINAL: {
 
-                    IFaceWithTypemapEchoParams data =
-                            IFaceWithTypemapEchoParams.deserialize(payload);
+                    IFaceWithTypemapEchoParams data = IFaceWithTypemapEchoParams.decode(decoder);
 
-                    getImpl().echo(data.param, new IFaceWithTypemapEchoResponseParamsProxyToResponder(getCore(), receiver, requestId));
+                    impl.echo(data.param, new IFaceWithTypemapEchoResponseParamsProxyToResponder(getCore(), receiver, requestId));
                     return true;
                 }
 
@@ -136,8 +136,7 @@ Echo_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static IFaceWithTypemapEchoParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -148,19 +147,15 @@ Echo_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             IFaceWithTypemapEchoParams result = new IFaceWithTypemapEchoParams(elementsOrVersion);
                     {
-                        
                     org.chromium.mojo.bindings.Decoder decoder1 = decoder0.readPointer(8, false);
                     result.param = Typemapped.decode(decoder1);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.param, 8, false);
         }
     }
@@ -192,8 +187,7 @@ Echo_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static IFaceWithTypemapEchoResponseParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -204,19 +198,15 @@ Echo_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             IFaceWithTypemapEchoResponseParams result = new IFaceWithTypemapEchoResponseParams(elementsOrVersion);
                     {
-                        
                     org.chromium.mojo.bindings.Decoder decoder1 = decoder0.readPointer(8, false);
                     result.out = Typemapped.decode(decoder1);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.out, 8, false);
         }
     }
@@ -230,8 +220,8 @@ Echo_Response callback) {
         }
 
         @Override
-        protected void forwardResponse(org.chromium.mojo.bindings.Message payload) {
-            IFaceWithTypemapEchoResponseParams response = IFaceWithTypemapEchoResponseParams.deserialize(payload);
+        protected void forwardResponse(org.chromium.mojo.bindings.Decoder decoder) {
+            IFaceWithTypemapEchoResponseParams response = IFaceWithTypemapEchoResponseParams.decode(decoder);
             mCallback.call(response.out);
         }
     }

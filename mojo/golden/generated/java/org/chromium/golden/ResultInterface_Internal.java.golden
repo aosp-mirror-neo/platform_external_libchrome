@@ -106,9 +106,10 @@ SyncMethod_Response callback) {
         @Override
         protected boolean handleMessageWithResponder(
                 int methodId,
-                org.chromium.mojo.bindings.Message payload,
+                org.chromium.mojo.bindings.Decoder decoder,
                 org.chromium.mojo.bindings.MessageReceiver receiver,
                 long requestId) {
+            ResultInterface impl = getImpl();
             switch (methodId) {
 
 
@@ -118,10 +119,9 @@ SyncMethod_Response callback) {
 
                 case METHOD_ORDINAL: {
 
-                    ResultInterfaceMethodParams data =
-                            ResultInterfaceMethodParams.deserialize(payload);
+                    ResultInterfaceMethodParams data = ResultInterfaceMethodParams.decode(decoder);
 
-                    getImpl().method(data.a, new ResultInterfaceMethodResponseParamsProxyToResponder(getCore(), receiver, requestId));
+                    impl.method(data.a, new ResultInterfaceMethodResponseParamsProxyToResponder(getCore(), receiver, requestId));
                     return true;
                 }
 
@@ -133,10 +133,9 @@ SyncMethod_Response callback) {
 
                 case SYNC_METHOD_ORDINAL: {
 
-                    ResultInterfaceSyncMethodParams data =
-                            ResultInterfaceSyncMethodParams.deserialize(payload);
+                    ResultInterfaceSyncMethodParams data = ResultInterfaceSyncMethodParams.decode(decoder);
 
-                    getImpl().syncMethod(data.a, new ResultInterfaceSyncMethodResponseParamsProxyToResponder(getCore(), receiver, requestId));
+                    impl.syncMethod(data.a, new ResultInterfaceSyncMethodResponseParamsProxyToResponder(getCore(), receiver, requestId));
                     return true;
                 }
 
@@ -190,8 +189,7 @@ SyncMethod_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static ResultInterfaceMethodParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -202,18 +200,14 @@ SyncMethod_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             ResultInterfaceMethodParams result = new ResultInterfaceMethodParams(elementsOrVersion);
                     {
-                        
                     result.a = decoder0.readBoolean(8, 0);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.a, 8, 0);
         }
     }
@@ -245,8 +239,7 @@ SyncMethod_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static ResultInterfaceMethodResponseParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -257,18 +250,14 @@ SyncMethod_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             ResultInterfaceMethodResponseParams result = new ResultInterfaceMethodResponseParams(elementsOrVersion);
                     {
-                        
                     result.result = ResultInterfaceMethodResponseParamResult.decode(decoder0, 8);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.result, 8, false);
         }
     }
@@ -282,8 +271,8 @@ SyncMethod_Response callback) {
         }
 
         @Override
-        protected void forwardResponse(org.chromium.mojo.bindings.Message payload) {
-            ResultInterfaceMethodResponseParams response = ResultInterfaceMethodResponseParams.deserialize(payload);
+        protected void forwardResponse(org.chromium.mojo.bindings.Decoder decoder) {
+            ResultInterfaceMethodResponseParams response = ResultInterfaceMethodResponseParams.decode(decoder);
             var mojoObj = response.result;
             mCallback.call(Method_Response_Converter.convert(mojoObj));
         }
@@ -352,8 +341,7 @@ SyncMethod_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static ResultInterfaceSyncMethodParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -364,18 +352,14 @@ SyncMethod_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             ResultInterfaceSyncMethodParams result = new ResultInterfaceSyncMethodParams(elementsOrVersion);
                     {
-                        
                     result.a = decoder0.readBoolean(8, 0);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.a, 8, 0);
         }
     }
@@ -407,8 +391,7 @@ SyncMethod_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static ResultInterfaceSyncMethodResponseParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -419,18 +402,14 @@ SyncMethod_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             ResultInterfaceSyncMethodResponseParams result = new ResultInterfaceSyncMethodResponseParams(elementsOrVersion);
                     {
-                        
                     result.result = ResultInterfaceSyncMethodResponseParamResult.decode(decoder0, 8);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.result, 8, false);
         }
     }
@@ -444,8 +423,8 @@ SyncMethod_Response callback) {
         }
 
         @Override
-        protected void forwardResponse(org.chromium.mojo.bindings.Message payload) {
-            ResultInterfaceSyncMethodResponseParams response = ResultInterfaceSyncMethodResponseParams.deserialize(payload);
+        protected void forwardResponse(org.chromium.mojo.bindings.Decoder decoder) {
+            ResultInterfaceSyncMethodResponseParams response = ResultInterfaceSyncMethodResponseParams.decode(decoder);
             var mojoObj = response.result;
             mCallback.call(SyncMethod_Response_Converter.convert(mojoObj));
         }

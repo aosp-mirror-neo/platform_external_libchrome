@@ -85,9 +85,10 @@ Method_Response callback) {
         @Override
         protected boolean handleMessageWithResponder(
                 int methodId,
-                org.chromium.mojo.bindings.Message payload,
+                org.chromium.mojo.bindings.Decoder decoder,
                 org.chromium.mojo.bindings.MessageReceiver receiver,
                 long requestId) {
+            IFace impl = getImpl();
             switch (methodId) {
 
 
@@ -97,10 +98,9 @@ Method_Response callback) {
 
                 case METHOD_ORDINAL: {
 
-                    IFaceMethodParams data =
-                            IFaceMethodParams.deserialize(payload);
+                    IFaceMethodParams data = IFaceMethodParams.decode(decoder);
 
-                    getImpl().method(data.param, new IFaceMethodResponseParamsProxyToResponder(getCore(), receiver, requestId));
+                    impl.method(data.param, new IFaceMethodResponseParamsProxyToResponder(getCore(), receiver, requestId));
                     return true;
                 }
 
@@ -136,8 +136,7 @@ Method_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static IFaceMethodParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -148,18 +147,14 @@ Method_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             IFaceMethodParams result = new IFaceMethodParams(elementsOrVersion);
                     {
-                        
                     result.param = decoder0.readBoolean(8, 0);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.param, 8, 0);
         }
     }
@@ -191,8 +186,7 @@ Method_Response callback) {
          * @throws org.chromium.mojo.bindings.DeserializationException on deserialization failure.
          */
         public static IFaceMethodResponseParams deserialize(java.nio.ByteBuffer data) {
-            return deserialize(new org.chromium.mojo.bindings.Message(
-                    data, new java.util.ArrayList<org.chromium.mojo.system.Handle>()));
+            return deserialize(new org.chromium.mojo.bindings.Message(data));
         }
 
         @SuppressWarnings("unchecked")
@@ -203,18 +197,14 @@ Method_Response callback) {
             final int elementsOrVersion = decoder0.readAndValidateStructHeader(STRUCT_SIZE);
             IFaceMethodResponseParams result = new IFaceMethodResponseParams(elementsOrVersion);
                     {
-                        
                     result.result = decoder0.readString(8, false);
                     }
-            decoder0.decreaseStackDepth();
             return result;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        protected final void encode(org.chromium.mojo.bindings.Encoder encoder) {
-            org.chromium.mojo.bindings.Encoder encoder0 = encoder.getEncoderAtDataOffset(STRUCT_SIZE, STRUCT_VERSION);
-            
+        protected final void encodeFields(org.chromium.mojo.bindings.Encoder encoder0) {
             encoder0.encode(this.result, 8, false);
         }
     }
@@ -228,8 +218,8 @@ Method_Response callback) {
         }
 
         @Override
-        protected void forwardResponse(org.chromium.mojo.bindings.Message payload) {
-            IFaceMethodResponseParams response = IFaceMethodResponseParams.deserialize(payload);
+        protected void forwardResponse(org.chromium.mojo.bindings.Decoder decoder) {
+            IFaceMethodResponseParams response = IFaceMethodResponseParams.decode(decoder);
             mCallback.call(response.result);
         }
     }
