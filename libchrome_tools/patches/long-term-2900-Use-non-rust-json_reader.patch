@@ -1,7 +1,8 @@
-From 3d85c10609fdd68dae0d3818c6f14bc7f5bbc3de Mon Sep 17 00:00:00 2001
+From 9443413e777529f6b1429cceecf853a168081d0c Mon Sep 17 00:00:00 2001
 From: Kevin Lin <kevinptt@google.com>
 Date: Fri, 6 Mar 2026 16:24:27 +0800
-Subject: [PATCH] Use non-rust json_reader and revert essential JSONParser changes
+Subject: [PATCH] Use non-rust json_reader and revert essential JSONParser
+ changes
 
 The rust-related files are currently not supported in libchrome.
 
@@ -11,25 +12,29 @@ the JSONParser class used by the non-rust JSONReader.
 Also include an essential revert of crrev.com/c/7691304 to restore necessary
 internal::JSONParser references.
 
+Also keep a local StackMarker in json_parser.cc, since crrev.com/c/8694366
+removed base::internal::StackMarker from base/json/json_common.h.
+
 Change-Id: Id9bbec76e81447d47d1353089d1bfd97557285af
+patch-name: long-term-2900-Use-non-rust-json_reader.patch
 ---
- base/json/json_parser.cc          | 871 ++++++++++++++++++++++++++++++
+ base/json/json_parser.cc          | 896 ++++++++++++++++++++++++++++++
  base/json/json_parser.h           | 269 +++++++++
  base/json/json_parser_unittest.cc | 341 ++++++++++++
  base/json/json_reader.cc          |  28 +-
  base/values.cc                    |   5 +
  base/values.h                     |   8 +
- 6 files changed, 1511 insertions(+), 11 deletions(-)
+ 6 files changed, 1536 insertions(+), 11 deletions(-)
  create mode 100644 base/json/json_parser.cc
  create mode 100644 base/json/json_parser.h
  create mode 100644 base/json/json_parser_unittest.cc
 
 diff --git a/base/json/json_parser.cc b/base/json/json_parser.cc
 new file mode 100644
-index 0000000000..85129f7830
+index 0000000000..8995da8418
 --- /dev/null
 +++ b/base/json/json_parser.cc
-@@ -0,0 +1,871 @@
+@@ -0,0 +1,896 @@
 +// Copyright 2012 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -49,6 +54,7 @@ index 0000000000..85129f7830
 +#include "base/feature_list.h"
 +#include "base/features.h"
 +#include "base/json/json_reader.h"
++#include "base/memory/raw_ptr.h"
 +#include "base/notreached.h"
 +#include "base/numerics/safe_conversions.h"
 +#include "base/strings/string_number_conversions.h"
@@ -62,6 +68,30 @@ index 0000000000..85129f7830
 +namespace base::internal {
 +
 +namespace {
++
++// Simple class that checks for maximum recursion/stack overflow.
++// base::internal::StackMarker was removed from base/json/json_common.h in
++// crrev.com/c/8694366 since upstream JSONReader uses the Rust parser. Keep a
++// local copy for the non-Rust JSONParser used by libchrome.
++class StackMarker {
++ public:
++  StackMarker(size_t max_depth, size_t* depth)
++      : max_depth_(max_depth), depth_(depth) {
++    ++(*depth_);
++    DCHECK_LE(*depth_, max_depth_);
++  }
++
++  StackMarker(const StackMarker&) = delete;
++  StackMarker& operator=(const StackMarker&) = delete;
++
++  ~StackMarker() { --(*depth_); }
++
++  bool IsTooDeep() const { return *depth_ >= max_depth_; }
++
++ private:
++  const size_t max_depth_;
++  const raw_ptr<size_t> depth_;
++};
 +
 +// Values 1000 and above are used by JSONFileValueSerializer::JsonFileError.
 +static_assert(JSONParser::JSON_PARSE_ERROR_COUNT < 1000,
@@ -1524,7 +1554,7 @@ index 0000000000..bd4a1c169e
 +
 +}  // namespace base::internal
 diff --git a/base/json/json_reader.cc b/base/json/json_reader.cc
-index 4d120e83ec..af7736a410 100644
+index 2d1c3329d4..f3dafc7c37 100644
 --- a/base/json/json_reader.cc
 +++ b/base/json/json_reader.cc
 @@ -7,14 +7,14 @@
@@ -1545,7 +1575,7 @@ index 4d120e83ec..af7736a410 100644
  // This namespace defines FFI-friendly functions that are be called from Rust in
  // //third_party/rust/serde_json_lenient/v0_2/wrapper/.
  namespace serde_json_lenient {
-@@ -117,6 +117,7 @@ base::JSONReader::Result DecodeJSONInRust(std::string_view json,
+@@ -116,6 +116,7 @@ base::JSONReader::Result DecodeJSONInRust(std::string_view json,
  
  }  // namespace
  }  // namespace serde_json_lenient
@@ -1553,7 +1583,7 @@ index 4d120e83ec..af7736a410 100644
  
  namespace base {
  
-@@ -129,12 +130,8 @@ std::string JSONReader::Error::ToString() const {
+@@ -128,12 +129,8 @@ std::string JSONReader::Error::ToString() const {
  std::optional<Value> JSONReader::Read(std::string_view json,
                                        int options,
                                        size_t max_depth) {
@@ -1568,7 +1598,7 @@ index 4d120e83ec..af7736a410 100644
  }
  
  // static
-@@ -163,8 +160,17 @@ std::optional<ListValue> JSONReader::ReadList(std::string_view json,
+@@ -162,8 +159,17 @@ std::optional<ListValue> JSONReader::ReadList(std::string_view json,
  JSONReader::Result JSONReader::ReadAndReturnValueWithError(
      std::string_view json,
      int options) {
@@ -1589,10 +1619,10 @@ index 4d120e83ec..af7736a410 100644
  
  }  // namespace base
 diff --git a/base/values.cc b/base/values.cc
-index 74384e6316..41d80d24e2 100644
+index afd3d1e9b7..cbd3e002e3 100644
 --- a/base/values.cc
 +++ b/base/values.cc
-@@ -30,6 +30,7 @@
+@@ -31,6 +31,7 @@
  #include "base/trace_event/memory_usage_estimator.h"  // no-presubmit-check
  #include "base/trace_event/trace_event.h"
  #include "base/tracing_buildflags.h"
@@ -1600,7 +1630,7 @@ index 74384e6316..41d80d24e2 100644
  #include "base/types/to_address.h"
  
  namespace base {
-@@ -360,6 +361,10 @@ DictValue::DictValue(flat_map<std::string, std::unique_ptr<Value>> storage)
+@@ -361,6 +362,10 @@ DictValue::DictValue(flat_map<std::string, std::unique_ptr<Value>> storage)
    }));
  }
  
@@ -1612,7 +1642,7 @@ index 74384e6316..41d80d24e2 100644
  
  DictValue& DictValue::operator=(DictValue&&) noexcept = default;
 diff --git a/base/values.h b/base/values.h
-index dcb83d4410..35a0e2d84c 100644
+index 24108e81ff..ef68e5833e 100644
 --- a/base/values.h
 +++ b/base/values.h
 @@ -30,6 +30,7 @@
@@ -1645,4 +1675,5 @@ index dcb83d4410..35a0e2d84c 100644
  
    // Returns true if there are no entries in this dictionary and false
 -- 
-2.53.0.851.ga537e3e6e9-goog
+2.56.0.455.g6c5a503b38-goog
+

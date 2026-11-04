@@ -16,6 +16,8 @@ namespace base::features {
 // alongside the definition of their values in the .cc file.
 
 // Alphabetical:
+BASE_EXPORT BASE_DECLARE_FEATURE(kBase64SimdBase64Encode);
+
 BASE_EXPORT BASE_DECLARE_FEATURE(kFeatureParamWithCache);
 
 BASE_EXPORT BASE_DECLARE_FEATURE(kFastFilePathIsParent);
@@ -34,8 +36,6 @@ BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(
     kRecordLockAcquisitionTimeAllowedThreads);
 
 BASE_EXPORT BASE_DECLARE_FEATURE(kScopedBestEffortExecutionFenceForTaskQueue);
-
-BASE_EXPORT BASE_DECLARE_FEATURE(kSimdutfBase64Encode);
 
 BASE_EXPORT BASE_DECLARE_FEATURE(kStackScanMaxFramePointerToStackEndGap);
 BASE_EXPORT BASE_DECLARE_FEATURE_PARAM(

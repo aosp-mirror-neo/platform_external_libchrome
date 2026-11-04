@@ -1,0 +1,96 @@
+From 13443599a87346ce24886c0d6551fced5b56c6c4 Mon Sep 17 00:00:00 2001
+From: Jeff Lin <jeffulin@google.com>
+Date: Wed, 4 Nov 2026 13:27:16 +0000
+Subject: [PATCH] Keep public base::Feature::default_state for ChromeOS clients
+
+r1728394 (crrev.com/c/8638439) made base::Feature::default_state
+private, r1731814 (crrev.com/c/8601065) moved the default state into
+the packed state word, and r1734629 (crrev.com/c/8694325) now tags it
+into the low bits of base::Feature::tagged_state, so the member no
+longer exists.
+
+chromeos-base/redaction_tool still reads base::Feature::default_state
+directly. Add a public const member back, initialized by the
+BASE_FEATURE*() macros with the same value that GetDefaultState()
+returns, until redaction_tool is migrated to GetDefaultState() in
+crrev.com/c/8682761.
+
+BUG=b:581572552
+TEST=sudo emerge libchrome
+
+patch-name: backward-compatibility-2200-Keep-public-base-Feature-default_state.patch
+---
+ base/feature.h          | 11 +++++++++--
+ base/feature_internal.h |  3 +++
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/base/feature.h b/base/feature.h
+index 4dcc9d8c7a..1b063499ea 100644
+--- a/base/feature.h
++++ b/base/feature.h
+@@ -221,8 +221,9 @@ struct BASE_EXPORT Feature {
+ 
+   constexpr Feature(const char* name,
+                     void* tagged_state,
++                    FeatureState default_state,
+                     internal::FeatureMacroHandshake handshake)
+-      : name(name), tagged_state(tagged_state) {
++      : name(name), default_state(default_state), tagged_state(tagged_state) {
+ #if BUILDFLAG(ENABLE_BANNED_BASE_FEATURE_PREFIX)
+     if (std::string_view(name).starts_with(
+             BUILDFLAG(BANNED_BASE_FEATURE_PREFIX))) {
+@@ -257,6 +258,11 @@ struct BASE_EXPORT Feature {
+   // command line switch.
+   FeatureState GetDefaultState() const;
+ 
++  // TODO(b/581572552): ChromeOS-only member kept for backward compatibility
++  // with clients that read the default state directly. It always equals
++  // GetDefaultState(). Remove once all clients use GetDefaultState().
++  const FeatureState default_state;
++
+  private:
+   friend class FeatureList;
+   friend class FeatureListTest;
+@@ -326,9 +332,10 @@ struct BASE_EXPORT FeatureWithCountryRestriction : public Feature {
+   constexpr FeatureWithCountryRestriction(
+       const char* feature_name,
+       void* tagged_state,
++      FeatureState default_state,
+       base::span<const std::string_view> countries_list,
+       internal::FeatureMacroHandshake handshake)
+-      : Feature(feature_name, tagged_state, handshake),
++      : Feature(feature_name, tagged_state, default_state, handshake),
+         countries(countries_list) {}
+ 
+   FeatureWithCountryRestriction(const FeatureWithCountryRestriction&) = delete;
+diff --git a/base/feature_internal.h b/base/feature_internal.h
+index 188791e1c7..bf36dec209 100644
+--- a/base/feature_internal.h
++++ b/base/feature_internal.h
+@@ -167,6 +167,7 @@ BASE_FEATURE_STATE_SECTION inline constinit FeatureStateStorage
+       name,                                                              \
+       BASE_FEATURE_INTERNAL_STATE(is_runtime_mutable, default_state,     \
+                                   !base::IsCountrySpecificFeatureState), \
++      (default_state),                                                   \
+       base::internal::FeatureMacroHandshake::kSecret)
+ 
+ // Two-argument version of BASE_FEATURE macro.
+@@ -179,6 +180,7 @@ BASE_FEATURE_STATE_SECTION inline constinit FeatureStateStorage
+       }(),                                                               \
+       BASE_FEATURE_INTERNAL_STATE(is_runtime_mutable, default_state,     \
+                                   !base::IsCountrySpecificFeatureState), \
++      (default_state),                                                   \
+       base::internal::FeatureMacroHandshake::kSecret)
+ 
+ // Helper macro to deduce whether to use the 2 or 3 argument version of the
+@@ -199,6 +201,7 @@ BASE_FEATURE_STATE_SECTION inline constinit FeatureStateStorage
+           }(),                                                              \
+           BASE_FEATURE_INTERNAL_STATE(false, default_state,                 \
+                                       base::IsCountrySpecificFeatureState), \
++          (default_state),                                                  \
+           []() {                                                            \
+             static constexpr auto countries =                               \
+                 base::internal::MakeCountryCodeStorage(__VA_ARGS__);        \
+-- 
+2.56.0.455.g6c5a503b38-goog
+

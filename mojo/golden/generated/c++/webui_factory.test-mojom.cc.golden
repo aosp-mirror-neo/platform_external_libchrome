@@ -17,7 +17,6 @@
 #include "base/notreached.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
-#include "base/task/thread_pool/thread_pool_instance.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/typed_macros.h"
 #include "mojo/public/cpp/bindings/lib/default_construct_tag_internal.h"
@@ -114,7 +113,7 @@ void PageProxy::OnSomethingHappened(
 
   const size_t estimated_payload_size =
     0;
-  mojo::Message message(
+  STACK_UNINITIALIZED mojo::Message message(
       std::to_underlying(messages::Page::kOnSomethingHappened), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::Page_OnSomethingHappened_Params_Data> params(
@@ -147,10 +146,8 @@ bool PageStubDispatch::Accept(
       Page_OnSomethingHappened_ParamsDataView input_data_view(params, message);
       
       if (!success) {
-        ReportValidationErrorForMessage(
-            message,
-            mojo::internal::VALIDATION_ERROR_DESERIALIZATION_FAILED,
-            Page::Name_, 0, false);
+        mojo::internal::ReportDeserializationErrorForMessage(
+            message, Page::Name_, 0, false);
         return false;
       }
       // A null |impl| means no implementation was bound.
@@ -264,7 +261,7 @@ void PageHandlerProxy::DoSomething(
 
   const size_t estimated_payload_size =
     0;
-  mojo::Message message(
+  STACK_UNINITIALIZED mojo::Message message(
       std::to_underlying(messages::PageHandler::kDoSomething), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::PageHandler_DoSomething_Params_Data> params(
@@ -297,10 +294,8 @@ bool PageHandlerStubDispatch::Accept(
       PageHandler_DoSomething_ParamsDataView input_data_view(params, message);
       
       if (!success) {
-        ReportValidationErrorForMessage(
-            message,
-            mojo::internal::VALIDATION_ERROR_DESERIALIZATION_FAILED,
-            PageHandler::Name_, 0, false);
+        mojo::internal::ReportDeserializationErrorForMessage(
+            message, PageHandler::Name_, 0, false);
         return false;
       }
       // A null |impl| means no implementation was bound.
@@ -424,7 +419,7 @@ void WebUiPageHandlerFactoryProxy::CreatePageHandler(
 
   const size_t estimated_payload_size =
     0;
-  mojo::Message message(
+  STACK_UNINITIALIZED mojo::Message message(
       std::to_underlying(messages::WebUiPageHandlerFactory::kCreatePageHandler), kFlags, estimated_payload_size);
   mojo::internal::MessageFragment<
       ::golden::internal::WebUiPageHandlerFactory_CreatePageHandler_Params_Data> params(
@@ -484,19 +479,13 @@ bool WebUiPageHandlerFactoryStubDispatch::Accept(
       ::mojo::PendingReceiver<PageHandler> p_handler{};
       WebUiPageHandlerFactory_CreatePageHandler_ParamsDataView input_data_view(params, message);
       
-      if (success) {
-        p_page =
-            input_data_view.TakePage<decltype(p_page)>();
-      }
-      if (success) {
-        p_handler =
-            input_data_view.TakeHandler<decltype(p_handler)>();
-      }
+      if (success)
+        input_data_view.TakePage(&p_page);
+      if (success)
+        input_data_view.TakeHandler(&p_handler);
       if (!success) {
-        ReportValidationErrorForMessage(
-            message,
-            mojo::internal::VALIDATION_ERROR_DESERIALIZATION_FAILED,
-            WebUiPageHandlerFactory::Name_, 0, false);
+        mojo::internal::ReportDeserializationErrorForMessage(
+            message, WebUiPageHandlerFactory::Name_, 0, false);
         return false;
       }
       // A null |impl| means no implementation was bound.

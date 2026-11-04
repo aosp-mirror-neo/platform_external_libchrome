@@ -1,0 +1,74 @@
+From 7a525edf6ed7e0c611031e030800ff4e53510d83 Mon Sep 17 00:00:00 2001
+From: Jeff Lin <jeffulin@google.com>
+Date: Wed, 4 Nov 2026 14:26:30 +0000
+Subject: [PATCH] Use modp_b64 instead of the Rust base64 encoder
+
+r1732037 (crrev.com/c/8694650) makes base::Base64EncodeAppend() use the
+Rust base64 crate (through base/base64_rust_shim.rs.h) when
+kBase64SimdBase64Encode is enabled, and r1732134 (crrev.com/c/8616235)
+removes the simdutf implementation.
+
+The rust-related files are currently not supported in libchrome. Drop
+the Rust includes and make the base64-simd encoding path fall back to
+modp_b64, which is also the default path (kBase64SimdBase64Encode is
+disabled by default).
+
+BUG=None
+TEST=sudo emerge libchrome
+
+patch-name: long-term-3400-Use-modp_b64-instead-of-the-Rust-base64-encoder.patch
+---
+ base/base64.cc | 21 +++------------------
+ 1 file changed, 3 insertions(+), 18 deletions(-)
+
+diff --git a/base/base64.cc b/base/base64.cc
+index 20818c378a..2bf689c462 100644
+--- a/base/base64.cc
++++ b/base/base64.cc
+@@ -9,16 +9,13 @@
+ #include <string_view>
+ #include <utility>
+ 
+-#include "base/base64_rust_shim.rs.h"
+ #include "base/check.h"
+ #include "base/containers/span.h"
+-#include "base/containers/span_rust.h"
+ #include "base/features.h"
+ #include "base/numerics/checked_math.h"
+ #include "base/strings/string_util.h"
+ #include "base/strings/string_view_util.h"
+ #include "third_party/modp_b64/modp_b64.h"
+-#include "third_party/rust/cxx/v1/cxx.h"
+ 
+ namespace base {
+ 
+@@ -55,23 +52,11 @@ void Base64EncodeAppendModpB64(span<const uint8_t> input, std::string* output) {
+   CHECK_EQ(written_size, write.size());
+ }
+ 
++// The rust-related files are currently not supported in libchrome, so the
++// Rust base64-simd encoder is not available. Fall back to modp_b64.
+ void Base64EncodeAppendBase64Simd(span<const uint8_t> input,
+                                   std::string* output) {
+-  // Ensure `modp_b64_encode_data_len` will not overflow.
+-  // For now, use this with Rust base64 as well for consistency.
+-  CHECK_LE(input.size(), MODP_B64_MAX_INPUT_LEN);
+-
+-  size_t encode_data_len = internal::base64_simd_encoded_length(input.size());
+-
+-  const size_t after_size =
+-      CheckAdd(encode_data_len, output->size()).ValueOrDie();
+-  output->resize(after_size);
+-
+-  span<uint8_t> write = as_writable_bytes(span(*output).last(encode_data_len));
+-
+-  const size_t written_size = internal::base64_simd_encode(
+-      SpanToRustSlice(input), rust::Slice<uint8_t>(write.data(), write.size()));
+-  CHECK_EQ(written_size, write.size());
++  Base64EncodeAppendModpB64(input, output);
+ }
+ 
+ }  // namespace
+-- 
+2.56.0.455.g6c5a503b38-goog
+

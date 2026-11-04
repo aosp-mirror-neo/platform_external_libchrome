@@ -129,7 +129,6 @@ struct SchedulerLoopQuarantineTestParamSmall {
   constexpr static QuarantineConfig kConfig = {
       .branch_capacity_in_bytes = 256,
       .enable_quarantine = true,
-      .enable_zapping = true,
       .max_quarantine_size = 1024,
   };
 };
@@ -138,7 +137,6 @@ struct SchedulerLoopQuarantineTestParamLarge {
   constexpr static QuarantineConfig kConfig = {
       .branch_capacity_in_bytes = 2048,
       .enable_quarantine = true,
-      .enable_zapping = true,
       .max_quarantine_size = 1024,
   };
 };
@@ -147,7 +145,6 @@ struct SchedulerLoopQuarantineTestParamSmallThreadBound {
   constexpr static QuarantineConfig kConfig = {
       .branch_capacity_in_bytes = 256,
       .enable_quarantine = true,
-      .enable_zapping = true,
       .max_quarantine_size = 1024,
   };
 };
@@ -156,7 +153,6 @@ struct SchedulerLoopQuarantineTestParamLargeThreadBound {
   constexpr static QuarantineConfig kConfig = {
       .branch_capacity_in_bytes = 2048,
       .enable_quarantine = true,
-      .enable_zapping = true,
       .max_quarantine_size = 1024,
   };
 };
@@ -302,6 +298,31 @@ TYPED_TEST(SchedulerLoopQuarantineTest, TooLargeAllocation) {
   ASSERT_TRUE(this->GetQuarantineBranch()->IsQuarantinedForTesting(object));
 }
 
+TYPED_TEST(SchedulerLoopQuarantineTest, ZapMax) {
+  constexpr size_t kZapMax = 8;
+  constexpr size_t kObjectSize = 64;
+  constexpr unsigned char kInitialByte = 0xab;
+  static_assert(kInitialByte != internal::kFreedByte);
+
+  QuarantineConfig config = this->GetConfig();
+  config.zap_max = kZapMax;
+  this->GetQuarantineBranch()->Configure(*this->GetQuarantineRoot(), config);
+
+  auto& object = *static_cast<std::array<unsigned char, kObjectSize>*>(
+      this->GetPartitionRoot()->Alloc(kObjectSize));
+  object.fill(kInitialByte);
+
+  this->Quarantine(&object);
+  ASSERT_TRUE(this->GetQuarantineBranch()->IsQuarantinedForTesting(&object));
+
+  for (size_t i = 0; i < kZapMax; ++i) {
+    EXPECT_EQ(internal::kFreedByte, object[i]);
+  }
+  for (size_t i = kZapMax; i < kObjectSize; ++i) {
+    EXPECT_EQ(kInitialByte, object[i]);
+  }
+}
+
 TYPED_TEST(SchedulerLoopQuarantineTest, ScopedOptOut) {
   if (!this->GetQuarantineBranch()->kThreadBound) {
     // Supported only on lock-less mode.
@@ -442,6 +463,56 @@ TYPED_TEST(ThreadBoundSchedulerLoopQuarantineTest,
   branch->OnTaskFinish();
   // Should become paused (1) after task.
   EXPECT_EQ(1, branch->PausedCountForTesting());
+}
+
+TYPED_TEST(ThreadBoundSchedulerLoopQuarantineTest,
+           BulkPurgeAvoidsThreadCacheOverflow) {
+  auto* branch = this->GetQuarantineBranch();
+  auto* root = this->GetQuarantineRoot();
+  auto* allocator_root = this->GetPartitionRoot();
+  auto* tcache = allocator_root->thread_cache_for_testing();
+  ASSERT_TRUE(internal::ThreadCache::IsValid(tcache));
+
+  QuarantineConfig config = this->GetConfig();
+  config.branch_capacity_in_bytes = 1024 * 1024;
+  config.enable_quarantine = true;
+  config.enable_task_controlled_purge = true;
+  config.pause_in_between_tasks = true;
+  branch->Configure(*root, config);
+
+  tcache->Purge();
+  branch->OnTaskStart();
+
+  constexpr size_t kAllocSize = 32;
+  constexpr size_t kCount = 128;
+  std::vector<void*> ptrs;
+  ptrs.reserve(kCount);
+  for (size_t i = 0; i < kCount; ++i) {
+    ptrs.push_back(allocator_root->Alloc(kAllocSize));
+  }
+  auto* slot_span = internal::SlotSpanMetadata::FromSlotStart(
+      SlotStart::Unchecked(ptrs[0]).Untag(), allocator_root);
+  const size_t bucket_index =
+      allocator_root->SlotSpanToBucketSizeDetails(slot_span).bucket_index();
+  const uint8_t limit = tcache->bucket_for_testing(bucket_index)
+                            .limit.load(std::memory_order_relaxed);
+  ASSERT_GT(limit, 1u);
+
+  tcache->Purge();
+  ASSERT_EQ(0u, tcache->bucket_count_for_testing(bucket_index));
+
+  for (void* ptr : ptrs) {
+    this->Quarantine(ptr);
+  }
+  EXPECT_EQ(kCount, this->GetStats().count);
+
+  // Full task-end purge should replenish the bucket up to its post-clearing
+  // target (`(limit + 1) / 2`) and batch-free the remaining slots directly to
+  // the root without overflowing `limit`.
+  branch->OnTaskFinish();
+  EXPECT_EQ(0u, this->GetStats().count);
+  EXPECT_EQ(static_cast<size_t>((limit + 1) / 2),
+            tcache->bucket_count_for_testing(bucket_index));
 }
 
 }  // namespace
