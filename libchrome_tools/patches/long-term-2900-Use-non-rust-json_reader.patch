@@ -1,4 +1,4 @@
-From 9443413e777529f6b1429cceecf853a168081d0c Mon Sep 17 00:00:00 2001
+From 26ba414e701f6fe27d0d7db09181d095ea32759b Mon Sep 17 00:00:00 2001
 From: Kevin Lin <kevinptt@google.com>
 Date: Fri, 6 Mar 2026 16:24:27 +0800
 Subject: [PATCH] Use non-rust json_reader and revert essential JSONParser
@@ -18,23 +18,23 @@ removed base::internal::StackMarker from base/json/json_common.h.
 Change-Id: Id9bbec76e81447d47d1353089d1bfd97557285af
 patch-name: long-term-2900-Use-non-rust-json_reader.patch
 ---
- base/json/json_parser.cc          | 896 ++++++++++++++++++++++++++++++
- base/json/json_parser.h           | 269 +++++++++
+ base/json/json_parser.cc          | 897 ++++++++++++++++++++++++++++++
+ base/json/json_parser.h           | 270 +++++++++
  base/json/json_parser_unittest.cc | 341 ++++++++++++
- base/json/json_reader.cc          |  28 +-
+ base/json/json_reader.cc          |  30 +-
  base/values.cc                    |   5 +
  base/values.h                     |   8 +
- 6 files changed, 1536 insertions(+), 11 deletions(-)
+ 6 files changed, 1540 insertions(+), 11 deletions(-)
  create mode 100644 base/json/json_parser.cc
  create mode 100644 base/json/json_parser.h
  create mode 100644 base/json/json_parser_unittest.cc
 
 diff --git a/base/json/json_parser.cc b/base/json/json_parser.cc
 new file mode 100644
-index 0000000000..8995da8418
+index 0000000000..beee3c0c86
 --- /dev/null
 +++ b/base/json/json_parser.cc
-@@ -0,0 +1,896 @@
+@@ -0,0 +1,897 @@
 +// Copyright 2012 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -169,7 +169,8 @@ index 0000000000..8995da8418
 +      error_code_(JSON_NO_ERROR),
 +      error_line_(0),
 +      error_column_(0) {
-+  CHECK_LE(max_depth, kAbsoluteMaxDepth);
++  CHECK_GT(max_depth, 0u);
++  CHECK_LE(max_depth, json_internal::kAbsoluteMaxDepth);
 +}
 +
 +JSONParser::~JSONParser() = default;
@@ -933,10 +934,10 @@ index 0000000000..8995da8418
 +}  // namespace base::internal
 diff --git a/base/json/json_parser.h b/base/json/json_parser.h
 new file mode 100644
-index 0000000000..92e058640b
+index 0000000000..bd39c49da0
 --- /dev/null
 +++ b/base/json/json_parser.h
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,270 @@
 +// Copyright 2012 The Chromium Authors
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -1010,7 +1011,8 @@ index 0000000000..92e058640b
 +  static const char kUnquotedDictionaryKey[];
 +  static const char kUnrepresentableNumber[];
 +
-+  explicit JSONParser(int options, size_t max_depth = kAbsoluteMaxDepth);
++  explicit JSONParser(int options,
++                      size_t max_depth = json_internal::kAbsoluteMaxDepth);
 +
 +  JSONParser(const JSONParser&) = delete;
 +  JSONParser& operator=(const JSONParser&) = delete;
@@ -1554,28 +1556,28 @@ index 0000000000..bd4a1c169e
 +
 +}  // namespace base::internal
 diff --git a/base/json/json_reader.cc b/base/json/json_reader.cc
-index 2d1c3329d4..f3dafc7c37 100644
+index 5b56dfb93b..e22503d5f9 100644
 --- a/base/json/json_reader.cc
 +++ b/base/json/json_reader.cc
-@@ -7,14 +7,14 @@
- #include <string_view>
+@@ -8,12 +8,14 @@
  #include <utility>
  
+ #include "base/check_op.h"
 +#include "base/json/json_parser.h"
- #include "base/logging.h"
++#include "base/logging.h"
  #include "base/strings/strcat.h"
  #include "base/strings/string_number_conversions.h"
- #include "build/build_config.h"
 -#include "base/strings/string_view_rust.h"
 -#include "third_party/rust/serde_json_lenient/v0_2/wrapper/functions.h"
 -#include "third_party/rust/serde_json_lenient/v0_2/wrapper/lib.rs.h"
++#include "build/build_config.h"
  
 +// Disable codes for rust.
 +#if 0
  // This namespace defines FFI-friendly functions that are be called from Rust in
  // //third_party/rust/serde_json_lenient/v0_2/wrapper/.
  namespace serde_json_lenient {
-@@ -116,6 +116,7 @@ base::JSONReader::Result DecodeJSONInRust(std::string_view json,
+@@ -117,6 +119,7 @@ base::JSONReader::Result DecodeJSONInRust(std::string_view json,
  
  }  // namespace
  }  // namespace serde_json_lenient
@@ -1583,7 +1585,7 @@ index 2d1c3329d4..f3dafc7c37 100644
  
  namespace base {
  
-@@ -128,12 +129,8 @@ std::string JSONReader::Error::ToString() const {
+@@ -129,12 +132,8 @@ std::string JSONReader::Error::ToString() const {
  std::optional<Value> JSONReader::Read(std::string_view json,
                                        int options,
                                        size_t max_depth) {
@@ -1598,12 +1600,12 @@ index 2d1c3329d4..f3dafc7c37 100644
  }
  
  // static
-@@ -162,8 +159,17 @@ std::optional<ListValue> JSONReader::ReadList(std::string_view json,
+@@ -163,8 +162,17 @@ std::optional<ListValue> JSONReader::ReadList(std::string_view json,
  JSONReader::Result JSONReader::ReadAndReturnValueWithError(
      std::string_view json,
      int options) {
 -  return serde_json_lenient::DecodeJSONInRust(json, options,
--                                              internal::kAbsoluteMaxDepth);
+-                                              json_internal::kAbsoluteMaxDepth);
 +  internal::JSONParser parser(options);
 +  auto value = parser.Parse(json);
 +  if (!value) {

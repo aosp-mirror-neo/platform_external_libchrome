@@ -9,11 +9,11 @@
 #include "base/memory/memory_pressure_level.h"
 #include "base/memory/memory_pressure_listener_registry.h"
 #include "base/memory/mock_memory_pressure_listener.h"
+#include "base/memory_coordinator/memory_pressure_source.h"
 #include "base/task/single_thread_task_runner.h"
 #include "base/task/thread_pool.h"
 #include "base/test/bind.h"
 #include "base/test/run_until.h"
-#include "base/test/scoped_feature_list.h"
 #include "base/test/task_environment.h"
 #include "base/threading/platform_thread.h"
 #include "base/threading/sequence_bound.h"
@@ -25,6 +25,7 @@ namespace base {
 using testing::_;
 
 TEST(MemoryPressureListenerTest, NotifyMemoryPressure) {
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
   RegisteredMockMemoryPressureListener listener;
   EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_NONE);
@@ -41,6 +42,7 @@ TEST(MemoryPressureListenerTest, NotifyMemoryPressure) {
 }
 
 TEST(MemoryPressureListenerTest, MemoryPressureSuppressionToken) {
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
   RegisteredMockMemoryPressureListener listener;
 
@@ -88,6 +90,7 @@ TEST(MemoryPressureListenerTest, MemoryPressureSuppressionToken) {
 }
 
 TEST(MemoryPressureListenerTest, SubscribeDuringPressure) {
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
   MockMemoryPressureListener listener;
 
@@ -105,7 +108,28 @@ TEST(MemoryPressureListenerTest, SubscribeDuringPressure) {
   EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_MODERATE);
 }
 
+TEST(MemoryPressureListenerTest, SubscribeWhileSuppressed) {
+  MemoryPressureSource source;
+  MemoryPressureListenerRegistry registry;
+  MemoryPressureListenerRegistry::NotifyMemoryPressure(
+      MEMORY_PRESSURE_LEVEL_CRITICAL);
+
+  std::optional<MemoryPressureSuppressionToken> token(std::in_place);
+  MemoryPressureListenerRegistry::SimulatePressureNotification(
+      MEMORY_PRESSURE_LEVEL_MODERATE);
+
+  // A new listener is initialized with the simulated level, not the real one.
+  RegisteredMockMemoryPressureListener listener;
+  EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_MODERATE);
+
+  // Lifting the suppression notifies the real level.
+  EXPECT_CALL(listener, OnMemoryPressure(MEMORY_PRESSURE_LEVEL_CRITICAL));
+  token.reset();
+  EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_CRITICAL);
+}
+
 TEST(MemoryPressureListenerTest, MemoryLimit) {
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
   RegisteredMockMemoryPressureListener listener;
 
@@ -126,6 +150,7 @@ TEST(MemoryPressureListenerTest, MemoryLimit) {
 }
 
 TEST(MemoryPressureListenerTest, RepeatedNotifications) {
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
   MockMemoryPressureListener listener;
   MemoryPressureListenerRegistration registration(
@@ -149,6 +174,7 @@ TEST(MemoryPressureListenerTest, RepeatedNotifications) {
 }
 
 TEST(MemoryPressureListenerTest, IgnoreRepeatedNotifications) {
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
   MockMemoryPressureListener listener;
   MemoryPressureListenerRegistration registration(
@@ -172,61 +198,9 @@ TEST(MemoryPressureListenerTest, IgnoreRepeatedNotifications) {
   EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_CRITICAL);
 }
 
-TEST(MemoryPressureListenerTest, SuppressMemoryListenersSyncInitial) {
-  test::ScopedFeatureList feature_list;
-  // Use InitAndEnableFeatureWithParameters instead of InitWithCommandLine
-  // because the former will disable param caching for the feature. Param
-  // caching is global state that can cause test failures when tests running in
-  // the same process use different param values.
-  // Suppress kTest (tag 0) for MODERATE.
-  // Mask '1' suppresses non-critical (MODERATE).
-  feature_list.InitAndEnableFeatureWithParameters(
-      kSuppressMemoryListeners, {{"suppress_memory_listeners_mask", "1"}});
-
-  MemoryPressureListenerRegistry registry;
-  MockMemoryPressureListener listener;
-
-  // Simulate before registration.
-  MemoryPressureListenerRegistry::SimulatePressureNotification(
-      MEMORY_PRESSURE_LEVEL_MODERATE);
-
-  EXPECT_CALL(listener, OnMemoryPressure(_)).Times(0);
-
-  MemoryPressureListenerRegistration registration(
-      MemoryPressureListenerTag::kTest, &listener);
-
-  // Since it is suppressed, it should be initialized to NONE.
-  EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_NONE);
-}
-
-TEST(MemoryPressureListenerTest,
-     SuppressMemoryListenersSyncInitialCriticalNotSuppressed) {
-  test::ScopedFeatureList feature_list;
-  // Use InitAndEnableFeatureWithParameters instead of InitWithCommandLine -see
-  // SuppressMemoryListenersSyncInitial for why.
-  // Suppress kTest (tag 0) for MODERATE only (mask '1').
-  feature_list.InitAndEnableFeatureWithParameters(
-      kSuppressMemoryListeners, {{"suppress_memory_listeners_mask", "1"}});
-
-  MemoryPressureListenerRegistry registry;
-  MockMemoryPressureListener listener;
-
-  // Simulate CRITICAL before registration.
-  MemoryPressureListenerRegistry::SimulatePressureNotification(
-      MEMORY_PRESSURE_LEVEL_CRITICAL);
-
-  EXPECT_CALL(listener, OnMemoryPressure(_)).Times(0);
-
-  MemoryPressureListenerRegistration registration(
-      MemoryPressureListenerTag::kTest, &listener);
-
-  // Since it is NOT suppressed for CRITICAL, it should be initialized to
-  // CRITICAL.
-  EXPECT_EQ(listener.memory_pressure_level(), MEMORY_PRESSURE_LEVEL_CRITICAL);
-}
-
 TEST(MemoryPressureListenerTest, SuppressionTokenFromNonMainThread) {
   test::TaskEnvironment task_env;
+  MemoryPressureSource source;
   MemoryPressureListenerRegistry registry;
 
   const PlatformThreadRef main_thread_ref = PlatformThread::CurrentRef();

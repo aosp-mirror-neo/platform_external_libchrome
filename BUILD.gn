@@ -570,6 +570,7 @@ libbase_sublibs = [
       "base/memory_coordinator/memory_consumer_registry.cc",
       "base/memory_coordinator/memory_coordinator_features.cc",
       "base/memory_coordinator/memory_limit.cc",
+      "base/memory_coordinator/memory_pressure_source.cc",
       "base/memory_coordinator/multi_memory_consumer.cc",
       "base/memory_coordinator/traits.cc",
       "base/message_loop/io_watcher.cc",
