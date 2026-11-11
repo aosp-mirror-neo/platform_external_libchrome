@@ -19,6 +19,7 @@
 #include "base/files/file_path.h"
 #include "base/functional/bind.h"
 #include "base/i18n/base_i18n_switches.h"
+#include "base/i18n/icu4c_tag_converter.h"
 #include "base/i18n/icubridge/default_icu_locale.h"
 #include "base/i18n/language_tag.h"
 #include "base/logging.h"
@@ -169,13 +170,8 @@ TextDirection GetTextDirectionInternal() {
 
 // Convert the ICU default locale to a string.
 std::string GetConfiguredLocale() {
-  return GetLocaleString(icu::Locale::getDefault());
-}
-
-// Convert the ICU canonicalized locale to a string.
-std::string GetCanonicalLocale(std::string_view locale) {
   return GetLocaleString(
-      icu::Locale::createCanonical(std::string(locale).c_str()));
+      IcuLocaleConverter::GetInstance().FromLanguageTag(GetDefaultIcuLocale()));
 }
 
 bool IsRTL() {

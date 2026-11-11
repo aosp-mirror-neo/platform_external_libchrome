@@ -1,22 +1,23 @@
-From 93810e5bcdefa668cf7c7d4d990bb89eef305b04 Mon Sep 17 00:00:00 2001
+From b13e832afae420ab59ce21cf1f3eed70f5596c13 Mon Sep 17 00:00:00 2001
 From: Kevin Lin <kevinptt@google.com>
 Date: Tue, 2 Dec 2025 10:29:04 +0800
 Subject: [PATCH] Disable unneeded Rust logging integration
 
 Change-Id: Iacf5974cdf24452778fb3def26d200514c778247
+patch-name: long-term-2800-Disable-unneeded-Rust-logging-integration.patch
 ---
  base/logging.cc | 6 ------
  1 file changed, 6 deletions(-)
 
 diff --git a/base/logging.cc b/base/logging.cc
-index 7beceac45c..224e72f693 100644
+index e2506e2383..87f3b508da 100644
 --- a/base/logging.cc
 +++ b/base/logging.cc
 @@ -35,7 +35,6 @@
  #include "base/functional/callback.h"
  #include "base/immediate_crash.h"
  #include "base/logging/logging_settings.h"
--#include "base/logging/rust_logger/lib.rs.h"
+-#include "base/logging/rust_logger/rust_logger.h"
  #include "base/no_destructor.h"
  #include "base/path_service.h"
  #include "base/pending_task.h"
@@ -32,13 +33,13 @@ index 7beceac45c..224e72f693 100644
    if ((g_logging_destination & LOG_TO_FILE) == 0) {
      return true;
 @@ -549,7 +544,6 @@ bool BaseInitLoggingImpl(const LoggingSettings& settings) {
-
+ 
  void SetMinLogLevel(int level) {
    g_min_log_level = std::min(LOGGING_FATAL, level);
 -  internal::update_rust_log_level(g_min_log_level);
  }
-
+ 
  int GetMinLogLevel() {
 -- 
-2.56.0.385.gd3acb90ef8-goog
+2.56.0.567.gdb80ae8cd5-goog
 
