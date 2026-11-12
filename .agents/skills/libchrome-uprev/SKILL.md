@@ -78,6 +78,11 @@ Provide the subagent with these exact instructions:
    - Actively use `git log -p` and other git commands within the `libchrome` repository to inspect individual upstream changes and determine what broke based on the handbook, logs, and git history.
 4. **Apply Fix**:
    - Apply the necessary fix (e.g. backward compatibility patch, header fix, or build flag adjustment) to the local `libchrome` codebase.
+   - **Never Edit `.patch` Files by Hand**: Do NOT edit `.patch` files in `libchrome_tools/patches/` by hand, as doing so leaves a stale `index <old>..<new>` blob header that causes `apply_patches.py`'s `git am -C1 --3way` fallback to abort if a future uprev conflicts near that hunk.
+   - **Regenerating `.patch` Files**: Always regenerate modified or newly added patches using `libchrome_tools/apply_patches.py` on a named git branch (with no untracked files in the repository root):
+     1. Run `libchrome_tools/apply_patches.py --last <patch-file> && libchrome_tools/apply_patches.py --format-patches`.
+     2. If `<patch-file>` conflicts during `--last`, resolve the conflict (or apply up to the preceding patch and commit the updated change with a `patch-name: <patch-file>` trailer in the commit message), then run `libchrome_tools/apply_patches.py --format-patches`.
+     3. Clean up temporary patch commits and untouched patch reformats via `git reset --hard HEAD-before-patching && git tag -d HEAD-before-patching` and `git checkout --` any earlier untouched `.patch` files so only the target `.patch` is modified.
 5. **Verify Fix & Upload (Branch by Mode)**:
 
    - **If `Local Chroot Mode`**:
